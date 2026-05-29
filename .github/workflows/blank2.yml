@@ -1,0 +1,40 @@
+name: Scheduled Stock Data Fetch
+
+on:
+  schedule:
+    # Runs automatically every day at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Keeps the manual "Run workflow" button active for testing
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    # Added pandas/openpyxl if you end up transforming the data into dataframes later
+    - name: Install Dependencies
+      run: |
+        pip install requests nbconvert ipykernel pandas openpyxl
+
+    - name: Run Jupyter Notebook
+      env:
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+      run: |
+        jupyter nbconvert --to notebook --execute data/fetch_data.ipynb
+
+    - name: Commit and Push Updated Data
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add data/stock_data.json
+        # Safely checks if there are actual updates before pushing to prevent empty run crashes
+        git diff-index --quiet HEAD || git commit -m "Automated data update: $(date)"
+        git push
